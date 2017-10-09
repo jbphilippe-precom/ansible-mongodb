@@ -1,0 +1,8 @@
+{% if mongodb_cluster_status.stdout == "0" %}
+config = {_id: "{{ mongodb_cluster_name }}", members: [{_id: 0, host: "{{ hostvars[groups[mongodb_inventory_cluster_name][0]]['mongodb_member_hostname']|default(host) }}:{{ mongodb_port }}", priority: {{ hostvars[groups[mongodb_inventory_cluster_name][0]]['mongodb_member_priority']|default(1) }}, votes: {{ hostvars[groups[mongodb_inventory_cluster_name][0]]['mongodb_member_votes']|default(1) }},}]}
+rs.initiate(config)
+{% endif %}
+{% for host in groups[mongodb_inventory_cluster_name] %}
+sleep(10000)
+rs.add({ host: "{{ hostvars[host]['mongodb_member_hostname']|default(host) }}:{{ mongodb_port }}", priority: {{ hostvars[host]['mongodb_member_priority']|default(1) }}, votes: {{ hostvars[host]['mongodb_member_votes']|default(1) }}, arbiterOnly: {{ hostvars[host]['mongodb_member_arbiterOnly']|default("false") }}, hidden: {{ hostvars[host]['mongodb_member_hidden']|default("false") }},})
+{% endfor %}

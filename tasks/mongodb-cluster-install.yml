@@ -1,0 +1,59 @@
+---
+
+# mongodb_member_hostname is used to define node names in cluster
+- set_fact: mongodb_member_hostname={{ inventory_hostname }}
+  when: mongodb_member_hostname is not defined
+
+- set_fact: mongodb_inventory_cluster_name={{ mongodb_inventory_cluster_name }}
+
+- name: Upload inventory facts
+  template: src=mongodb-cluster-nodes.j2 dest=/etc/ansible/facts.d/mongodb-cluster-nodes.fact owner=root group=root mode=0644
+  register: mongodb_cluster_nodes
+
+- name: Define Cluster Key
+  template: src=mongodb-key.j2 dest="{{ mongodb_key_file }}" owner=mongodb group=mongodb mode=0600
+
+- name: Apply global MongoDB Cluster configuration
+  template: src=mongodb-cluster-config.j2 dest="{{ mongodb_conf_file }}" owner=root group=root mode=0644
+  register: restart_mongodb_cluster_change
+
+- name: Define Cluster - Restart
+  service: name=mongod state=restarted
+  when: restart_mongodb_cluster_change|changed
+
+- name: Wait for MongoDB
+  wait_for: port={{ mongodb_port }}
+
+# if mongodb_cluster_status == '0' then the cluster is not initialized yet.
+- name: Get MongoDB cluster status
+  shell: export LC_ALL=C; mongo --port {{ mongodb_port }} --quiet -u admin -p {{ mongodb_admin_password }} admin --eval 'rs.status().ok'
+  register: mongodb_cluster_status
+  changed_when: false
+
+- set_fact: firstnode={{ hostvars[groups[mongodb_inventory_cluster_name][0]]['mongodb_member_hostname'] }}
+
+#- name: print firstnode
+#  debug: var=firstnode
+
+- name: Copy script to Initiate Cluster
+  template: src=mongodb-cluster-init.j2 dest=/usr/local/sbin/mongodb-cluster-init.sh owner=root group=root mode=0755
+
+- name: Copy script to Initiate Config
+  template: src=mongodb-cluster-init-js.j2 dest=/etc/mongodb-cluster-init.js owner=root group=root mode=0644
+  changed_when: false
+
+- name: Initiate Cluster
+  command: /usr/local/sbin/mongodb-cluster-init.sh {{ mongodb_admin_password }}
+  when: mongodb_cluster_status.stdout == '0' and mongodb_member_hostname == firstnode
+
+- name: Check if node is the master node
+  shell: export LC_ALL=C; mongo --port {{ mongodb_port }} --quiet -u admin -p {{ mongodb_admin_password }} admin --eval 'db.isMaster().ismaster'
+  register: actual_mongodb_master_status
+  changed_when: false
+
+- name: Update Cluster
+  command: /usr/local/sbin/mongodb-cluster-init.sh {{ mongodb_admin_password }}
+  when: mongodb_cluster_status.stdout != '0' and actual_mongodb_master_status.stdout == "true" and mongodb_cluster_nodes|changed
+
+- name: Wait for MongoDB
+  wait_for: port={{ mongodb_port }}

@@ -1,0 +1,39 @@
+---
+# tasks file for ansible-mongodb
+
+#
+# Non-defined mandatory variables
+#
+- fail: msg="This play requires 'mongodb_admin_password' in secret.yml"
+  when: mongodb_admin_password is not defined
+  tags: [installation]
+
+- fail: msg="This play requires 'mongodb_backup_password' in secret.yml"
+  when: mongodb_backup_password is not defined
+  tags: [installation]
+
+#
+# Non-defined mandatory variables for a cluster
+#
+- fail: msg="This play requires 'mongodb_cluster_name'"
+  when: mongodb_cluster_name is not defined and mongodb_cluster == 'true'
+  tags: [installation]
+
+- fail: msg="This play requires 'mongodb_cluster_key' in secret.yml"
+  when: mongodb_cluster_key is not defined and mongodb_cluster == 'true'
+  tags: [installation]
+
+#
+# Tasks
+#
+- include: mongodb-install.yml
+  when: ansible_distribution == 'Ubuntu'
+  tags: [installation]
+
+- include: mongodb-rollback.yml
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_release == 'trusty'
+  tags: [rollback]
+
+- include: mongodb-testing.yml
+  when: ansible_distribution == 'Ubuntu' and ansible_distribution_release == 'trusty'
+  tags: [testing]

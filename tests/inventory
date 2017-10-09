@@ -1,0 +1,42 @@
+## Trusty ##
+[r1t01]
+unitest01g.be10.local
+[r2t01]
+unitest02g.be10.local
+unitest03g.be10.local
+[r3t01]
+unitest10g.be10.local mongodb_member_hostname=unitest10g.be10.local mongodb_member_priority=2
+unitest11g.be10.local mongodb_member_priority=2
+unitest12g.be10.local mongodb_member_priority=1
+[r3t02]
+unitest22g.be10.local mongodb_member_hostname=unitest22g.be10.local mongodb_member_priority=2
+unitest23g.be10.local mongodb_member_priority=2
+unitest24g.be10.local mongodb_member_priority=1
+[r3t03]
+unitest25g.be10.local
+unitest26g.be10.local
+unitest27g.be10.local
+
+## Xenial ##
+[r1x01]
+unitest04g.be10.local
+[r1x02]
+unitest19g.be10.local
+[r2x01]
+unitest05g.be10.local
+unitest06g.be10.local
+[r2x02]
+unitest20g.be10.local
+unitest21g.be10.local
+[r3x01]
+unitest07g.be10.local
+unitest08g.be10.local
+unitest09g.be10.local
+[r3x02]
+unitest13g.be10.local
+unitest14g.be10.local
+unitest15g.be10.local
+[r3x03]
+unitest16g.be10.local mongodb_member_hostname=unitest16g.be10.local mongodb_member_priority=2
+unitest17g.be10.local mongodb_member_priority=2
+unitest18g.be10.local mongodb_member_priority=1

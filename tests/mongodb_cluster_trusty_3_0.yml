@@ -1,0 +1,17 @@
+---
+- hosts: r3t01
+  become: yes
+  roles:
+     - ../ansible-mongodb
+  vars:
+    mongodb_major_version: "3.0"
+    mongodb_minor_version: latest
+    mongodb_port: 27017
+    mongodb_bind_ip: 0.0.0.0
+    mongodb_admin_password: passwd
+    mongodb_backup_password: backup
+    mongodb_cluster_key: clacle
+    mongodb_cluster: "true"
+    mongodb_cluster_name: "Cluster_Trusty_3_0"
+    mongodb_engine: "wiredTiger"
+    mongodb_inventory_cluster_name: "r3t01"

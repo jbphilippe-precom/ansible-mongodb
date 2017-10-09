@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [ "$#" -ne 1 ]; then
+  echo "Usage: $0 <Mongo Admin password>"
+  exit 1
+fi
+
+export LC_ALL=C; mongo --port {{ mongodb_port }} --quiet -u admin -p $1 admin /etc/mongodb-cluster-init.js
+
+exit 0

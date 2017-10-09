@@ -1,0 +1,15 @@
+---
+# MongoDB
+- name: Install XFS utils
+  apt: name={{ item }} update_cache=yes state=latest
+  with_items:
+    - xfsprogs
+
+- name: Create MongoDB LV
+  lvol: vg={{ mongodb_vg_name }} lv={{ mongodb_lv_name }} size={{ mongodb_lv_size }}
+
+- name: Create xfs filesystem for mongodb
+  filesystem: fstype=xfs dev=/dev/{{ mongodb_vg_name }}/{{ mongodb_lv_name }}
+
+- name: Create mounpoint
+  mount: name={{ mongodb_datadir }} src=/dev/mapper/{{ mongodb_vg_name }}-{{ mongodb_lv_name }} fstype=xfs opts=nobarrier,noatime,logbufs=8 state=mounted

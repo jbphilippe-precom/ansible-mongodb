@@ -1,0 +1,11 @@
+/var/log/mongodb/mongod.log {
+    daily
+    rotate 20
+    compress
+    missingok
+    notifempty
+    sharedscripts
+    postrotate
+      /bin/kill -SIGUSR1 `cat {{ mongodb_datadir }}/mongod.lock 2> /dev/null` 2> /dev/null || true
+    endscript
+}

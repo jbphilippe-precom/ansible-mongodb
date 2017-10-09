@@ -1,0 +1,4 @@
+[mongodb_cluster_nodes]
+{% for host in groups[mongodb_inventory_cluster_name] %}
+{{ hostvars[host]['mongodb_member_hostname']|default(host) }}=1
+{% endfor %}

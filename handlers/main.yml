@@ -1,0 +1,11 @@
+---
+# handlers file for ansible-mongodb
+
+- name: Update Grub
+  shell: /usr/sbin/update-grub
+
+- name: Change disk scheduler to noop via shell
+  shell: echo noop > /sys/block/{{ mongodb_physical_disk }}/queue/scheduler
+
+- name: Restart MongoDB
+  service: name=mongod state=restarted

@@ -1,0 +1,196 @@
+---
+
+# system optimizations
+- name : Disable Transparent Huge Pages - enabled -
+  lineinfile: dest=/etc/rc.local insertbefore="^exit 0" line="echo never > /sys/kernel/mm/transparent_hugepage/enabled"
+  register: restart_mongodb_transparent_hugepage_enabled
+
+- name: Disable Transparent Huge Pages - enabled - via shell
+  shell: echo never > /sys/kernel/mm/transparent_hugepage/enabled
+  when: restart_mongodb_transparent_hugepage_enabled|changed
+
+- name : Disable Transparent Huge Pages - defrag -
+  lineinfile: dest=/etc/rc.local insertbefore="^exit 0" line="echo never > /sys/kernel/mm/transparent_hugepage/defrag"
+  register: restart_mongodb_transparent_hugepage_defrag
+
+- name: Disable Transparent Huge Pages - defrag - via shell
+  shell: echo never > /sys/kernel/mm/transparent_hugepage/defrag
+  when: restart_mongodb_transparent_hugepage_defrag|changed
+
+- name: Change disk scheduler to noop
+  replace: dest=/etc/default/grub regexp='elevator=deadline' replace='elevator=noop'
+  when: ansible_virtualization_role != "guest"
+  notify:
+  - Update Grub
+  - Change disk scheduler to noop via shell
+
+- name: Adapt environment for MongoDB
+  lineinfile: dest=/etc/environment line="LC_ALL=C"
+  tags: [installation-client]
+
+# MongoDB
+- name: Install utils
+  apt: name={{ item }} update_cache=yes state=latest
+  with_items:
+    - binutils
+
+# Use LVM ?
+- include: mongodb-lvm.yml
+  when: ansible_distribution == 'Ubuntu' and mongodb_use_lvm == 'true'
+
+- name: Ensure PyMongo from distrib is not installed
+  apt: name={{ item }} state=absent
+  with_items:
+    - python-pymongo-ext
+    - python-gridfs
+    - python-bson
+    - python-bson-ext
+    - pymongo
+  tags: [installation-client]
+
+- name: PyMongo Package Key
+  apt_key: url=http://aptrepo.services.local/systeme/pymongo/prod/systeme.gpg.pub state=present
+  tags: [installation-client]
+
+- name: PyMongo APT repository
+  apt_repository: repo='deb http://aptrepo.services.local/systeme/pymongo/prod {{ ansible_distribution_release }} main' state=present
+  tags: [installation-client]
+
+- name: Install PyMongo
+  apt: name=python-pymongo state=latest
+  tags: [installation-client]
+
+- name: MongoDB Package Key
+  apt_key: url=http://mirror.services.local/pubkey/10gen.asc state=present
+  when: mongodb_major_version == "3.0"
+  tags: [installation-client]
+
+#- name: MongoDB APT repository
+#  apt_repository: repo='deb http://mirror.services.local/mongodb3/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/3.0 multiverse' state=present
+#  when: mongodb_major_version == "3.0"
+#  tags: [installation-client]
+
+- name: MongoDB Package Key
+  apt_key: url=http://mirror.services.local/pubkey/10gen-{{ mongodb_major_version }}.asc state=present
+  tags: [installation-client]
+
+- name: MongoDB APT repository
+  apt_repository: repo='deb http://mirror.services.local/mongodb3/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/{{ mongodb_major_version }} multiverse' state=present
+  tags: [installation-client]
+
+# MongoDB specific version
+- name: Install specific MongoDB version (mongodb-org-server)
+  apt: name=mongodb-org-server={{ mongodb_minor_version }} state=present
+  when: mongodb_minor_version != "latest"
+
+- name: Install specific MongoDB version (mongodb-org-tools)
+  apt: name=mongodb-org-tools={{ mongodb_minor_version }} state=present
+  when: mongodb_minor_version != "latest"
+
+- name: Install specific MongoDB version (mongodb-org-shell)
+  apt: name=mongodb-org-shell={{ mongodb_minor_version }} state=present
+  when: mongodb_minor_version != "latest"
+  tags: [installation-client]
+
+- name: Install specific MongoDB version (mongodb-org-mongos)
+  apt: name=mongodb-org-mongos={{ mongodb_minor_version }} state=present
+  when: mongodb_minor_version != "latest"
+
+- name: Install specific MongoDB version (mongodb-org)
+  apt: name=mongodb-org={{ mongodb_minor_version }} state=present
+  when: mongodb_minor_version != "latest"
+
+# MongoDB latest version
+- name: Install latest MongoDB version (mongodb-org-server)
+  apt: name=mongodb-org-server state=latest
+  when: mongodb_minor_version == "latest"
+
+- name: Install latest MongoDB version (mongodb-org-tools)
+  apt: name=mongodb-org-tools state=latest
+  when: mongodb_minor_version == "latest"
+
+- name: Install latest MongoDB version (mongodb-org-shell)
+  apt: name=mongodb-org-shell state=latest
+  when: mongodb_minor_version == "latest"
+  tags: [installation-client]
+
+- name: Install latest MongoDB version (mongodb-org-mongos)
+  apt: name=mongodb-org-mongos state=latest
+  when: mongodb_minor_version == "latest"
+
+- name: Install latest MongoDB version (mongodb-org)
+  apt: name=mongodb-org state=latest
+  when: mongodb_minor_version == "latest"
+
+- name: Symlink mongod service file
+  file: src=/lib/systemd/system/mongod.service dest=/etc/systemd/system/mongod.service state=link force=yes
+  register: restart_mongodb_systemd_symlink
+  when: ansible_distribution_release == 'xenial'
+
+- name: start mongo
+  service: name=mongod state=started
+  when: restart_mongodb_systemd_symlink|changed
+
+- name: Get actual engine
+  shell: strings {{ mongodb_datadir }}/storage.bson | egrep -o 'mmapv1|wiredTiger'
+  register: actual_mongodb_engine
+  changed_when: false
+
+- name: Clean data dir when engine is changed
+  shell: rm -rf {{ mongodb_datadir }}/*
+  when: actual_mongodb_engine.stdout != mongodb_engine
+  register: restart_mongodb_engine
+
+- name: Check if configuration file is in new format
+  shell: grep "^  dbPath{{':'}}" {{ mongodb_conf_file }}
+  ignore_errors: yes
+  register: newformat_result
+  changed_when: false
+
+- name: Change MongoDB engine in current configuration - temporary when version <= 3.0.7
+  lineinfile: dest="{{ mongodb_conf_file }}" line="storageEngine = {{ mongodb_engine }}"
+  when: restart_mongodb_engine|changed and mongodb_minor_version < "3.0.7" or mongodb_minor_version != "latest" and newformat_result.rc!=0
+
+- name: Change MongoDB engine in current configuration - temporary when version >= 3.0.7
+  replace: dest="{{ mongodb_conf_file }}" regexp='#  engine{{':'}}' replace='  engine{{':'}} "{{ mongodb_engine }}"'
+  when: restart_mongodb_engine|changed and mongodb_minor_version >= "3.0.7" or mongodb_minor_version == "latest" and newformat_result.rc==0
+
+- name: Change MongoDB engine - Restart
+  service: name=mongod state=restarted
+  when: restart_mongodb_engine|changed
+
+- name: Wait for MongoDB
+  wait_for: port=27017
+
+- name: Create facts dir
+  file: path=/etc/ansible/facts.d/ state=directory owner=root group=root mode=0755
+
+- name: Create admin user
+  mongodb_user: database=admin name=admin password="{{ mongodb_admin_password }}" roles='root' state=present
+  when: ansible_local.mongodb_admin_users.admins.created is undefined
+  register: mongodb_admin_users
+
+- name: Create backup user
+  mongodb_user: database=admin name=backup password="{{ mongodb_backup_password }}" roles='backup,restore' state=present
+  when: ansible_local.mongodb_admin_users.admins.created is undefined
+  register: mongodb_admin_users
+
+- name: Create admin users fact
+  template: src=mongodb_admin_users.j2 dest=/etc/ansible/facts.d/mongodb_admin_users.fact owner=root group=root mode=0644
+  when: mongodb_admin_users|changed
+
+- name: Configure logrotate for MongoDB
+  template: src=mongodb-logrotate.j2 dest=/etc/logrotate.d/mongod owner=root group=root mode=0644
+
+- name: Apply global MongoDB configuration
+  template: src=mongodb-config.j2 dest="{{ mongodb_conf_file }}" owner=root group=root mode=0644
+  when: mongodb_cluster != 'true'
+  register: mongodb_upload_template
+
+- name: Global MongoDB configuration upload - Restart
+  service: name=mongod state=restarted
+  when: mongodb_upload_template|changed
+
+- include: mongodb-cluster-install.yml
+  when: ansible_distribution == 'Ubuntu' and mongodb_cluster == 'true'
+#  when: ansible_distribution == 'Ubuntu' and mongodb_cluster == 'true'

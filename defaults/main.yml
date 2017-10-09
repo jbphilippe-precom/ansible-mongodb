@@ -1,0 +1,28 @@
+---
+# defaults file for ansible-mongodb
+
+mongodb_major_version: "3.0"
+mongodb_minor_version: latest
+
+mongodb_port: 27017
+mongodb_bind_ip: 127.0.0.1
+
+mongodb_use_lvm: "true"
+mongodb_vg_name: vg_vroot
+mongodb_lv_name: lv_mongo
+mongodb_lv_size: 10g
+
+mongodb_conf_file: /etc/mongod.conf
+mongodb_datadir: /var/lib/mongodb
+
+mongodb_engine: mmapv1
+
+mongodb_physical_disk: sda
+
+mongodb_cluster: false
+mongodb_inventory_cluster_name: MongoDB_Cluster
+mongodb_key_file: /etc/mongodb.key
+mongodb_member_priority: 1
+mongodb_member_votes: 1
+mongodb_member_arbiterOnly: false
+mongodb_member_hidden: false

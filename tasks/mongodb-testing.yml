@@ -1,0 +1,36 @@
+---
+
+- name: Is MongoDB listening ?
+  wait_for: port={{ mongodb_port }} delay=2 timeout=10
+
+# logrotate
+- stat: path=/etc/logrotate.d/mongod
+  register: mongodlogrotate
+
+- name: Verify that logrotate is configured
+  assert:
+    that:
+      - mongodlogrotate.stat.exists
+
+# Cluster name
+- shell: export LC_ALL=C; mongo --port {{ mongodb_port }} --quiet -u admin -p {{ mongodb_admin_password }} admin --eval 'rs.conf()._id'
+  register: mongodb_cluster_name_running
+  changed_when: false
+  when: mongodb_cluster == 'true'
+
+- name: Verify Cluster name
+  assert:
+    that:
+      - "'{{ mongodb_cluster_name }}' in mongodb_cluster_name_running.stdout"
+  when: mongodb_cluster == 'true'
+
+# Cluster facts
+- stat: path=/etc/ansible/facts.d/mongodb-cluster-nodes.fact
+  register: mongodfacts
+  when: mongodb_cluster == 'true'
+
+- name: Verify that facts are configured for the MongoDB Cluster
+  assert:
+    that:
+      - mongodfacts.stat.exists
+  when: mongodb_cluster == 'true'
